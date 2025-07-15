@@ -1,0 +1,136 @@
+version: 2
+
+models:
+  - name: stg_plan_medical_group
+    description: "Staging table for plans and medical groups reference data"
+    columns:
+      - name: medical_group_id
+        description: "Unique identifier for the medical group"
+        data_type: integer
+        tests:
+          - not_null
+      - name: plan_id
+        description: "Unique identifier for the insurance plan"
+        data_type: integer
+        tests:
+          - not_null
+      - name: medical_group_name
+        description: "Name of the medical group"
+        data_type: string
+        tests:
+          - not_null
+      - name: plan_name
+        description: "Name of the insurance plan"
+        data_type: string
+        tests:
+          - not_null
+    tests:
+      - unique:
+          column_name: "medical_group_id || '-' || plan_id"
+          config:
+            severity: error
+
+  - name: stg_claims_awv
+    description: "Staging table for Annual Wellness Visit claims data"
+    columns:
+      - name: medical_group_id
+        description: "Identifier for the medical group"
+        data_type: integer
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_plan_medical_group')
+              field: medical_group_id
+      - name: patient_id
+        description: "Unique identifier for the patient"
+        data_type: varchar
+        tests:
+          - not_null
+      - name: plan_id
+        description: "Identifier for the insurance plan"
+        data_type: integer
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_plan_medical_group')
+              field: plan_id
+      - name: awv_date_of_service
+        description: "Date of service for the Annual Wellness Visit"
+        data_type: date
+
+    tests:
+      - unique:
+          column_name: "medical_group_id || '-' || plan_id || '-' || patient_id || '-' || awv_date_of_service"
+          config:
+            severity: warn
+
+  - name: stg_actions_available
+    description: "Staging table for available AWV actions per day"
+    columns:
+      - name: date_day
+        description: "Date of the available actions"
+        data_type: date
+        tests:
+          - not_null
+      - name: medical_group_id
+        description: "Identifier for the medical group"
+        data_type: integer
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_plan_medical_group')
+              field: medical_group_id
+      - name: plan_id
+        description: "Identifier for the insurance plan"
+        data_type: integer
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_plan_medical_group')
+              field: plan_id
+      - name: count_actions_available
+        description: "Number of available actions on this date"
+        data_type: integer
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              inclusive: true
+    tests:
+      - unique:
+          column_name: "date_day || '-' || medical_group_id || '-' || plan_id"
+          config:
+            severity: error
+
+  - name: stg_actions_attested_as_complete
+    description: "Staging table for actions attested as complete per day"
+    columns:
+      - name: date_day
+        description: "Date of the attested actions"
+        data_type: date
+        tests:
+          - not_null
+      - name: medical_group_id
+        description: "Identifier for the medical group"
+        data_type: integer
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_plan_medical_group')
+              field: medical_group_id
+      - name: plan_id
+        description: "Identifier for the insurance plan"
+        data_type: integer
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_plan_medical_group')
+              field: plan_id
+      - name: count_actions_attested_as_complete
+        description: "Number of actions attested as complete on this date"
+        data_type: integer
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              inclusive: true

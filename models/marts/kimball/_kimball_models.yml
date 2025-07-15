@@ -1,0 +1,241 @@
+version: 2
+
+models:
+  # =============================================================================
+  # DIMENSION TABLES
+  # =============================================================================
+  
+  - name: dim_date_spine_day
+    description: "Dimension table for dates using a date spine to handle missing dates in the data. Provides comprehensive date attributes for time-based analysis."
+    
+    columns:
+      - name: date_day
+        description: "Primary date field in YYYY-MM-DD format"
+        tests:
+          - not_null
+          - unique
+      
+      - name: year
+        description: "Four-digit year extracted from date_day"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 2020
+              max_value: 2030
+              inclusive: true
+      
+      - name: quarter
+        description: "Quarter of the year (1-4)"
+        tests:
+          - not_null
+          - accepted_values:
+              values: [1, 2, 3, 4]
+      
+      - name: month
+        description: "Month of the year (1-12)"
+        tests:
+          - not_null
+          - accepted_values:
+              values: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+      
+      - name: day
+        description: "Day of the month (1-31)"
+        tests:
+          - not_null
+          - accepted_values:
+              values: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]
+      
+      - name: year_month
+        description: "Year and month in YYYY-MM format for easy grouping"
+        tests:
+          - not_null
+      
+      - name: week_number
+        description: "ISO week number of the year (1-53)"
+        tests:
+          - not_null
+      
+      - name: day_of_week
+        description: "ISO day of the week (1=Monday, 7=Sunday)"
+        tests:
+          - not_null
+          - accepted_values:
+              values: [1, 2, 3, 4, 5, 6, 7]
+      
+      - name: is_weekend
+        description: "Boolean flag indicating if the date is a weekend (1=weekend, 0=weekday)"
+        tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+
+  - name: dim_medical_group
+    description: "Dimension table containing unique medical groups and their descriptive information"
+    
+    columns:
+      - name: medical_group_id
+        description: "Unique identifier for each medical group"
+        tests:
+          - not_null
+          - unique
+      
+      - name: medical_group_name
+        description: "Human-readable name of the medical group"
+        tests:
+          - not_null
+
+  - name: dim_patient
+    description: "Dimension table containing unique patients who have had AWV claims"
+    
+    columns:
+      - name: patient_id
+        description: "Unique identifier for each patient"
+        tests:
+          - not_null
+          - unique
+
+  - name: dim_plan
+    description: "Dimension table containing unique insurance plans and their descriptive information"
+    
+    columns:
+      - name: plan_id
+        description: "Unique identifier for each insurance plan"
+        tests:
+          - not_null
+          - unique
+      
+      - name: plan_name
+        description: "Human-readable name of the insurance plan"
+        tests:
+          - not_null
+
+  # =============================================================================
+  # FACT TABLES
+  # =============================================================================
+  
+  - name: fct_awv_action
+    description: "Fact table containing daily AWV action metrics including available actions and attested complete actions. Includes calculated AAC percentage for performance monitoring."
+    
+    columns:
+      - name: date_day
+        description: "Date of the AWV action activity"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_date_spine_day')
+              field: date_day
+      
+      - name: medical_group_id
+        description: "Foreign key to medical group dimension"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_medical_group')
+              field: medical_group_id
+      
+      - name: plan_id
+        description: "Foreign key to plan dimension"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_plan')
+              field: plan_id
+      
+      - name: count_actions_available
+        description: "Number of AWV actions available for completion on this date"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              inclusive: true
+      
+      - name: count_actions_attested_as_complete
+        description: "Number of AWV actions attested as complete on this date"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              inclusive: true
+      
+      - name: aac_percent
+        description: "Actions Attested as Complete percentage (count_actions_attested_as_complete / count_actions_available * 100)"
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 100
+              inclusive: true
+
+  - name: fct_awv_claim
+    description: "Fact table containing individual AWV claim records from claims data. Each row represents one patient's AWV visit claim."
+    
+    columns:
+      - name: date_day
+        description: "Date of service for the AWV claim"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_date_spine_day')
+              field: date_day
+      
+      - name: medical_group_id
+        description: "Foreign key to medical group dimension"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_medical_group')
+              field: medical_group_id
+      
+      - name: plan_id
+        description: "Foreign key to plan dimension"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_plan')
+              field: plan_id
+      
+      - name: patient_id
+        description: "Foreign key to patient dimension"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_patient')
+              field: patient_id
+      
+      - name: awv_visit
+        description: "Flag indicating an AWV visit occurred (always 1 for aggregation purposes)"
+        tests:
+          - not_null
+          - accepted_values:
+              values: [1]
+
+  - name: fct_awv_patient_population
+    description: "Fact table containing patient panel sizes by medical group and plan. Used for calculating AWV rates (AWV visits / patient population)."
+    
+    columns:
+      - name: medical_group_id
+        description: "Foreign key to medical group dimension"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_medical_group')
+              field: medical_group_id
+      
+      - name: plan_id
+        description: "Foreign key to plan dimension"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_plan')
+              field: plan_id
+      
+      - name: patient_panel_size
+        description: "Total number of distinct patients in this medical group/plan combination"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 1
+              inclusive: true
+
+    tests:
+      - unique:
+          column_name: "medical_group_id || '-' || plan_id"

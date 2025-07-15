@@ -1,7 +1,6 @@
 -- models/staging/stg_actions_attested_as_complete.sql
 {{
     config(
-        schema="dbt_cbays",
         materialized="table",
         description="staging table for actions attested as complete",
     )

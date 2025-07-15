@@ -1,0 +1,192 @@
+version: 2
+
+models:
+  - name: int_awv_monthly_summary
+    description: "Monthly summary of AWV actions by medical group and plan"
+    columns:
+      - name: year
+        description: "Year of the monthly summary"
+        data_type: integer
+        tests:
+          - not_null
+      - name: month
+        description: "Month of the summary"
+        data_type: integer
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 1
+              max_value: 12
+              inclusive: true
+      - name: year_month
+        description: "Year-month in YYYY-MM format"
+        data_type: string
+        tests:
+          - not_null
+      - name: medical_group_id
+        description: "Identifier for the medical group"
+        data_type: integer
+        tests:
+          - not_null
+      - name: plan_id
+        description: "Identifier for the insurance plan"
+        data_type: integer
+        tests:
+          - not_null
+      - name: total_actions_available
+        description: "Total actions available in the month"
+        data_type: integer
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              inclusive: true
+      - name: total_actions_attested_as_complete
+        description: "Total actions attested as complete in the month"
+        data_type: integer
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              inclusive: true
+      - name: monthly_aac_percent
+        description: "Monthly AAC percentage"
+        data_type: float
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 100
+              inclusive: true
+      - name: aac_performance_status
+        description: "Performance status based on AAC percentage"
+        data_type: string
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Good', 'Needs Improvement', 'Critically Low', 'No Data']
+    tests:
+      - unique:
+          column_name: "year || '-' || month || '-' || medical_group_id || '-' || plan_id"
+          config:
+            severity: error
+
+  - name: int_awv_annual_summary
+    description: "Annual summary of AWV rates by medical group and plan"
+    columns:
+      - name: year
+        description: "Year of the annual summary"
+        data_type: integer
+        tests:
+          - not_null
+      - name: medical_group_id
+        description: "Identifier for the medical group"
+        data_type: integer
+        tests:
+          - not_null
+      - name: plan_id
+        description: "Identifier for the insurance plan"
+        data_type: integer
+        tests:
+          - not_null
+      - name: unique_patients_with_awv
+        description: "Number of unique patients with AWV"
+        data_type: integer
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              inclusive: true
+      - name: total_awv_visits
+        description: "Total number of AWV visits"
+        data_type: integer
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              inclusive: true
+      - name: patient_panel_size
+        description: "Size of the patient panel"
+        data_type: integer
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              inclusive: true
+      - name: annual_awv_rate_percent
+        description: "Annual AWV rate percentage"
+        data_type: float
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 100
+              inclusive: true
+      - name: awv_rate_performance_status
+        description: "Performance status based on AWV rate"
+        data_type: string
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Good', 'Needs Improvement', 'Critically Low', 'No Data']
+    tests:
+      - unique:
+          column_name: "year || '-' || medical_group_id || '-' || plan_id"
+          config:
+            severity: error
+
+  - name: int_medical_group_performance
+    description: "Combined performance metrics for medical groups"
+    columns:
+      - name: year
+        description: "Year of the performance metrics"
+        data_type: integer
+        tests:
+          - not_null
+      - name: month
+        description: "Month of the performance metrics"
+        data_type: integer
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 1
+              max_value: 12
+              inclusive: true
+      - name: medical_group_id
+        description: "Identifier for the medical group"
+        data_type: integer
+        tests:
+          - not_null
+      - name: mg_monthly_aac_percent
+        description: "Medical group combined monthly AAC percentage"
+        data_type: float
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 100
+              inclusive: true
+      - name: mg_annual_awv_rate_percent
+        description: "Medical group combined annual AWV rate percentage"
+        data_type: float
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 100
+              inclusive: true
+      - name: mg_aac_performance_status
+        description: "Medical group AAC performance status"
+        data_type: string
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Good', 'Needs Improvement', 'Critically Low', 'No Data']
+      - name: mg_awv_rate_performance_status
+        description: "Medical group AWV rate performance status"
+        data_type: string
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Good', 'Needs Improvement', 'Critically Low', 'No Data']
+    tests:
+      - unique:
+          column_name: "year || '-' || month || '-' || medical_group_id"
+          config:
+            severity: error

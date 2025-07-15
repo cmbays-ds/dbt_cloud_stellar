@@ -1,0 +1,257 @@
+version: 2
+
+models:
+  - name: rpt_operations_dashboard
+    description: "Operations dashboard view for medical group performance monitoring"
+    columns:
+      - name: year
+        description: "Year of the reporting period"
+        data_type: integer
+        tests:
+          - not_null
+      - name: month
+        description: "Month of the reporting period"
+        data_type: integer
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 1
+              max_value: 12
+              inclusive: true
+      - name: year_month
+        description: "Year-month in YYYY-MM format"
+        data_type: string
+        tests:
+          - not_null
+      - name: medical_group_id
+        description: "Identifier for the medical group"
+        data_type: integer
+        tests:
+          - not_null
+      - name: medical_group_name
+        description: "Name of the medical group"
+        data_type: string
+        tests:
+          - not_null
+      - name: plan_id
+        description: "Identifier for the insurance plan"
+        data_type: integer
+        tests:
+          - not_null
+      - name: plan_name
+        description: "Name of the insurance plan"
+        data_type: string
+        tests:
+          - not_null
+      - name: monthly_aac_percent
+        description: "Monthly AAC percentage"
+        data_type: float
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 100
+              inclusive: true
+      - name: annual_awv_rate_percent
+        description: "Annual AWV rate percentage"
+        data_type: float
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 100
+              inclusive: true
+      - name: aac_performance_status
+        description: "AAC performance status"
+        data_type: string
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Good', 'Needs Improvement', 'Critically Low', 'No Data']
+      - name: awv_rate_performance_status
+        description: "AWV rate performance status"
+        data_type: string
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Good', 'Needs Improvement', 'Critically Low', 'No Data']
+      - name: overall_performance_status
+        description: "Overall performance status combining both metrics"
+        data_type: string
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Excellent', 'Good', 'Needs Attention', 'Insufficient Data']
+      - name: aac_intervention_needed
+        description: "Flag indicating if AAC intervention is needed"
+        data_type: integer
+        tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+      - name: awv_rate_intervention_needed
+        description: "Flag indicating if AWV rate intervention is needed"
+        data_type: integer
+        tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+    tests:
+      - unique:
+          column_name: "year || '-' || month || '-' || medical_group_id || '-' || plan_id"
+          config:
+            severity: error
+
+  - name: rpt_awv_annual_rate
+    description: "Annual wellness visit rate reporting for operations team"
+    columns:
+      - name: year
+        description: "Year of the reporting period"
+        data_type: integer
+        tests:
+          - not_null
+      - name: medical_group_id
+        description: "Identifier for the medical group"
+        data_type: integer
+        tests:
+          - not_null
+      - name: medical_group_name
+        description: "Name of the medical group"
+        data_type: string
+        tests:
+          - not_null
+      - name: plan_id
+        description: "Identifier for the insurance plan"
+        data_type: integer
+        tests:
+          - not_null
+      - name: plan_name
+        description: "Name of the insurance plan"
+        data_type: string
+        tests:
+          - not_null
+      - name: annual_awv_rate_percent
+        description: "Annual AWV rate percentage at plan level"
+        data_type: float
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 100
+              inclusive: true
+      - name: mg_annual_awv_rate_percent
+        description: "Annual AWV rate percentage at medical group level"
+        data_type: float
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 100
+              inclusive: true
+      - name: target_awv_rate_percent
+        description: "Target AWV rate percentage (70%)"
+        data_type: float
+        tests:
+          - not_null
+          - accepted_values:
+              values: [70.0]
+      - name: plan_intervention_needed
+        description: "Flag indicating if plan-level intervention is needed"
+        data_type: integer
+        tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+      - name: medical_group_intervention_needed
+        description: "Flag indicating if medical group-level intervention is needed"
+        data_type: integer
+        tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+    tests:
+      - unique:
+          column_name: "year || '-' || medical_group_id || '-' || plan_id"
+          config:
+            severity: error
+
+  - name: rpt_aac_monthly
+    description: "Monthly AAC percentage reporting for operations team"
+    columns:
+      - name: year
+        description: "Year of the reporting period"
+        data_type: integer
+        tests:
+          - not_null
+      - name: month
+        description: "Month of the reporting period"
+        data_type: integer
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 1
+              max_value: 12
+              inclusive: true
+      - name: year_month
+        description: "Year-month in YYYY-MM format"
+        data_type: string
+        tests:
+          - not_null
+      - name: medical_group_id
+        description: "Identifier for the medical group"
+        data_type: integer
+        tests:
+          - not_null
+      - name: medical_group_name
+        description: "Name of the medical group"
+        data_type: string
+        tests:
+          - not_null
+      - name: plan_id
+        description: "Identifier for the insurance plan"
+        data_type: integer
+        tests:
+          - not_null
+      - name: plan_name
+        description: "Name of the insurance plan"
+        data_type: string
+        tests:
+          - not_null
+      - name: monthly_aac_percent
+        description: "Monthly AAC percentage at plan level"
+        data_type: float
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 100
+              inclusive: true
+      - name: mg_monthly_aac_percent
+        description: "Monthly AAC percentage at medical group level"
+        data_type: float
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 100
+              inclusive: true
+      - name: target_aac_percent
+        description: "Target AAC percentage (4%)"
+        data_type: float
+        tests:
+          - not_null
+          - accepted_values:
+              values: [4.0]
+      - name: plan_intervention_needed
+        description: "Flag indicating if plan-level intervention is needed"
+        data_type: integer
+        tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+      - name: medical_group_intervention_needed
+        description: "Flag indicating if medical group-level intervention is needed"
+        data_type: integer
+        tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+    tests:
+      - unique:
+          column_name: "year || '-' || month || '-' || medical_group_id || '-' || plan_id"
+          config:
+            severity: error
