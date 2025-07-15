@@ -1,0 +1,80 @@
+version: 2
+
+sources:
+  - name: raw_data
+    description: >
+      "Raw CSV data tables uploaded to Snowflake in 
+      PC_DBT_DB.DBT_CBAYS schema"
+    database: PC_DBT_DB
+    schema: DBT_CBAYS
+    tables:
+      - name: raw__AWVs_plan_medical_group
+        description: "Medical group and plan reference data"
+        columns:
+          - name: plan_id
+            data_type: number
+            description: >
+              "A join key representing the insurance plan. 
+              (Customers may have multiple plans under Stellar)."
+          - name: medical_group_id
+            data_type: number
+            description: >
+              "A join key representing the medical group. 
+              Medical groups may have multiple plans across 
+              multiple customers."
+          - name: plan_name
+            data_type: string
+          - name: medical_group_name
+            data_type: string
+      - name: raw__AWV_as_seen_in_claims
+        description: "Claims data for Annual Wellness Visits"
+        columns:
+          - name: awv_date_of_service
+            data_type: date
+            description: >
+              "The Date Of Service that has been recorded in the 
+              Claims Data for this Patient having had an Annual 
+              Wellness Visit done at this Medical Group."
+          - name: medical_group_id
+            data_type: number
+          - name: patient_id
+            data_type: number
+            description: >
+              "The ID of the patient that had a Claim with an 
+              AWV that day."
+          - name: plan_id
+            data_type: number
+      - name: raw__AWVs_actions_available
+        description: >
+          "Count of available actions per day for medical groups"
+        columns:
+          - name: plan_id
+            data_type: number
+          - name: medical_group_id
+            data_type: number
+          - name: date_day
+            data_type: date
+          - name: count_actions_available
+            data_type: number
+            description: >
+              "The number of eligible Annual Wellness Visit 
+              actions that are available in the application for 
+              this Medical Group / Plan combination for users of 
+              the Medical Group to complete - at day grain."
+      - name: raw__AWVs_attested_as_complete
+        description: >
+          "Count of actions attested as complete per day for 
+          medical groups"
+        columns:
+          - name: plan_id
+            data_type: number
+          - name: medical_group_id
+            data_type: number
+          - name: date_day
+            data_type: number
+          - name: count_actions_attested_as_complete
+            data_type: number
+            description: >
+              "The number of Annual Wellness Visits that a User 
+              has attested as complete in the application on this 
+              day - at day grain"
