@@ -41,11 +41,7 @@ select
     medical_group_id,
     plan_id,
     coalesce(count_actions_available, 0) as count_actions_available,
-    coalesce(count_actions_attested_as_complete, 0) as count_actions_attested_as_complete,
-    case
-        when coalesce(count_actions_available, 0) = 0 then null
-        else round(100.0 * count_actions_attested_as_complete / count_actions_available, 2)
-    end as aac_percent
+    coalesce(count_actions_attested_as_complete, 0) as count_actions_attested_as_complete
 from int_joined_actions
 )
 

@@ -1,192 +1,373 @@
 version: 2
 
 models:
-  - name: int_awv_monthly_summary
-    description: "Monthly summary of AWV actions by medical group and plan"
+  - name: int_daily_decomposition
+    description: >
+      Tracks the daily flow of actions for each medical_group-plan-date combination,
+      decomposing available actions into: completed, no longer eligible, and net changes;
+      provides quality flags and weekday/weekend classification.
     columns:
-      - name: year
-        description: "Year of the monthly summary"
-        data_type: integer
+      - name: date_day
+        description: "Date of the daily decomposition record."
         tests:
           - not_null
-      - name: month
-        description: "Month of the summary"
-        data_type: integer
+      - name: medical_group_id
+        description: "Unique identifier for the medical group."
+        tests:
+          - not_null
+      - name: plan_id
+        description: "Unique identifier for the plan."
+        tests:
+          - not_null
+      - name: actions_start_of_day
+        description: "Number of actions available at the start of the day."
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+      - name: actions_end_of_day
+        description: "Number of actions available at the end of the day."
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+      - name: daily_net_change_of_actions
+        description: "Net change in actions (start minus end of day)."
+        tests:
+          - not_null
+      - name: count_actions_completed_in_day
+        description: "Count of actions completed on the given day."
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+      - name: cumulative_actions_completed
+        description: "Cumulative number of actions completed up to and including the day."
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+      - name: count_actions_became_ineligible_in_day
+        description: "Number of actions that became ineligible (lost opportunity) on the day."
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+      - name: cumulative_actions_became_ineligible
+        description: "Cumulative number of actions that became ineligible (lost opportunities) up to the given day."
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+      - name: decomposition_balance_check
+        description: "Data quality check ensuring (start - end = completed + ineligible), else FALSE."
+        data_type: boolean
+        tests:
+          - not_null
+          - accepted_values:
+              values: [true]
+              severity: warn
+      - name: is_weekend
+        description: "Boolean flag: TRUE if the date is a Saturday or Sunday; else FALSE."
+        data_type: boolean
+        tests:
+          - not_null
+
+  - name: int_monthly_action_summary
+    description: >
+      Aggregates daily action decomposition into monthly metrics for each medical_group-plan combination.
+      Calculates completion, lost opportunity rates, and assigns performance status flags for AAC% and 
+      opportunity loss.
+    columns:
+      - name: medical_group_id
+        description: "Unique identifier for the medical group."
+        tests:
+          - not_null
+
+      - name: plan_id
+        description: "Unique identifier for the plan."
+        tests:
+          - not_null
+
+      - name: date_month
+        description: "First day of the month (DATE) for the aggregation."
+        tests:
+          - not_null
+
+      - name: actions_available_start_month
+        description: "Maximum actions available at the start of the month."
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+
+      - name: actions_available_end_of_month
+        description: "Minimum actions available at the end of the month."
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+
+      - name: monthly_actions_completed
+        description: "Total number of actions completed in the month."
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+
+      - name: monthly_actions_became_ineligible
+        description: "Total number of actions that became ineligible (lost opportunity) in the month."
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+
+      - name: monthly_running_total_actions_completed
+        description: "Cumulative actions completed as of month end."
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+
+      - name: monthly_running_total_actions_became_ineligible
+        description: "Cumulative actions that became ineligible as of month end."
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+
+      - name: monthly_net_change_of_actions
+        description: "Sum of daily net changes in actions for the month."
+        tests:
+          - not_null
+
+      - name: monthly_completion_rate
+        description: "Fraction of actions completed out of actions available at the start of the month (AAC%)."
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 1
+
+      - name: running_monthly_completion_rate
+        description: "Cumulative monthly completion rate (running total / start of month)."
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 1
+
+      - name: monthly_lost_opportunity_rate
+        description: "Fraction of lost opportunities in the month out of starting available actions."
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 1
+
+      - name: running_monthly_lost_opportunity_rate
+        description: "Cumulative lost opportunity rate up to month end."
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 1
+
+      - name: days_with_data
+        description: "Number of days in the month with data."
         tests:
           - not_null
           - dbt_utils.accepted_range:
               min_value: 1
-              max_value: 12
-              inclusive: true
-      - name: year_month
-        description: "Year-month in YYYY-MM format"
-        data_type: string
+
+      - name: weekend_days
+        description: "Number of weekend days (Saturday/Sunday) with data in the month."
         tests:
           - not_null
-      - name: medical_group_id
-        description: "Identifier for the medical group"
-        data_type: integer
-        tests:
-          - not_null
-      - name: plan_id
-        description: "Identifier for the insurance plan"
-        data_type: integer
-        tests:
-          - not_null
-      - name: total_actions_available
-        description: "Total actions available in the month"
-        data_type: integer
-        tests:
-          - not_null
-          - dbt_utils.accepted_range:
-              min_value: 0
-              inclusive: true
-      - name: total_actions_attested_as_complete
-        description: "Total actions attested as complete in the month"
-        data_type: integer
-        tests:
-          - not_null
-          - dbt_utils.accepted_range:
-              min_value: 0
-              inclusive: true
-      - name: monthly_aac_percent
-        description: "Monthly AAC percentage"
-        data_type: float
-        tests:
-          - dbt_utils.accepted_range:
-              min_value: 0
-              max_value: 100
-              inclusive: true
+
       - name: aac_performance_status
-        description: "Performance status based on AAC percentage"
-        data_type: string
+        description: "Performance status for AAC%: 'Meeting Target', 'Below Target', or 'Significantly Below Target'."
         tests:
           - not_null
           - accepted_values:
-              values: ['Good', 'Needs Improvement', 'Critically Low', 'No Data']
-    tests:
-      - unique:
-          column_name: "year || '-' || month || '-' || medical_group_id || '-' || plan_id"
-          config:
-            severity: error
+              values: ['Meeting Target', 'Below Target', 'Significantly Below Target']
+
+      - name: lost_opportunity_status
+        description: "Categorized lost opportunity status: 'Low Loss', 'Moderate Loss', or 'High Loss'."
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Low Loss', 'Moderate Loss', 'High Loss']
+
+      - name: monthly_completion_rate_prev_month
+        description: "AAC% from the previous month for this group and plan."
+        data_type: float
+
+      - name: monthly_lost_opportunity_rate_prev_month
+        description: "Lost opportunity rate from the previous month for this group and plan."
+        data_type: float
+
+      - name: monthly_completion_rate_change_mom
+        description: "Month-over-month change in AAC% (current - previous)."
+        data_type: float
+
+      - name: lost_opportunity_rate_change_mom
+        description: "Month-over-month change in lost opportunity rate."
+        data_type: float
+
 
   - name: int_awv_annual_summary
-    description: "Annual summary of AWV rates by medical group and plan"
+    description: "Annual AWV rate calculations with performance tracking"
     columns:
-      - name: year
-        description: "Year of the annual summary"
-        data_type: integer
-        tests:
-          - not_null
       - name: medical_group_id
-        description: "Identifier for the medical group"
+        description: "Medical group identifier"
         data_type: integer
         tests:
           - not_null
       - name: plan_id
-        description: "Identifier for the insurance plan"
+        description: "Insurance plan identifier"
         data_type: integer
         tests:
           - not_null
-      - name: unique_patients_with_awv
-        description: "Number of unique patients with AWV"
+      - name: service_year
+        description: "Year of the AWV rate calculation"
         data_type: integer
-        tests:
-          - not_null
-          - dbt_utils.accepted_range:
-              min_value: 0
-              inclusive: true
-      - name: total_awv_visits
-        description: "Total number of AWV visits"
+      - name: visit_count
+        description: "Number of patients with AWV visits"
         data_type: integer
         tests:
           - not_null
           - dbt_utils.accepted_range:
               min_value: 0
-              inclusive: true
-      - name: patient_panel_size
-        description: "Size of the patient panel"
+      - name: patient_count
+        description: "Total number of patients in the panel"
         data_type: integer
         tests:
           - not_null
           - dbt_utils.accepted_range:
               min_value: 0
-              inclusive: true
-      - name: annual_awv_rate_percent
-        description: "Annual AWV rate percentage"
+      - name: awv_rate
+        description: "Annual Wellness Visit rate (patients with AWV / total patients)"
         data_type: float
         tests:
+          - not_null
           - dbt_utils.accepted_range:
               min_value: 0
-              max_value: 100
-              inclusive: true
-      - name: awv_rate_performance_status
-        description: "Performance status based on AWV rate"
-        data_type: string
+              max_value: 1
+      - name: awv_performance_status
+        description: "Performance status: 'Good', 'Needs Improvement', or 'Missing Data' based on 70% AWV target"
+        data_type: varchar
         tests:
           - not_null
           - accepted_values:
-              values: ['Good', 'Needs Improvement', 'Critically Low', 'No Data']
-    tests:
-      - unique:
-          column_name: "year || '-' || medical_group_id || '-' || plan_id"
-          config:
-            severity: error
+              values: ['Good', 'Needs Improvement', 'Missing Data']
+      - name: visit_gap
+        description: "Number of additional AWV visits needed to meet the 70% target"
+        data_type: integer
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+      - name: remaining_patients_without_visit
+        description: "Number of patients who have not had an AWV"
+        data_type: integer
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
 
-  - name: int_medical_group_performance
-    description: "Combined performance metrics for medical groups"
+  - name: int_awv_monthly_summary
+    description: >
+      "Monthly summary of Annual Wellness Visit (AWV) metrics per medical group and 
+      plan for each service month, including cumulative visit rate, status, and target 
+      gap tracking."
     columns:
-      - name: year
-        description: "Year of the performance metrics"
-        data_type: integer
-        tests:
-          - not_null
-      - name: month
-        description: "Month of the performance metrics"
-        data_type: integer
-        tests:
-          - not_null
-          - dbt_utils.accepted_range:
-              min_value: 1
-              max_value: 12
-              inclusive: true
       - name: medical_group_id
-        description: "Identifier for the medical group"
-        data_type: integer
+        description: "Unique identifier for the medical group."
         tests:
           - not_null
-      - name: mg_monthly_aac_percent
-        description: "Medical group combined monthly AAC percentage"
-        data_type: float
+
+      - name: plan_id
+        description: "Unique identifier for the insurance plan."
         tests:
+          - not_null
+
+      - name: service_year_month
+        description: "Year and month (YYYY-MM) representing the visit service period."
+        tests:
+          - not_null
+
+      - name: visit_count_per_month
+        description: "Number of AWV visits during the month."
+        tests:
+          - not_null
           - dbt_utils.accepted_range:
               min_value: 0
-              max_value: 100
-              inclusive: true
-      - name: mg_annual_awv_rate_percent
-        description: "Medical group combined annual AWV rate percentage"
-        data_type: float
+
+      - name: cumulative_monthly_visits
+        description: "Cumulative number of AWV visits from the first month through the current month."
         tests:
+          - not_null
           - dbt_utils.accepted_range:
               min_value: 0
-              max_value: 100
-              inclusive: true
-      - name: mg_aac_performance_status
-        description: "Medical group AAC performance status"
-        data_type: string
+
+      - name: total_patient_count
+        description: "Total number of patients in the panel for that medical group and plan."
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+
+      - name: awv_cumulative_monthly_visit_rate
+        description: "Cumulative AWV visit rate: (cumulative_monthly_visits / total_patient_count)."
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 1
+
+      - name: monthly_awv_performance_status
+        description: "Performance status: 'Good', 'Needs Improvement', or 'Missing Data', based on a 70% cumulative visit rate target."
         tests:
           - not_null
           - accepted_values:
-              values: ['Good', 'Needs Improvement', 'Critically Low', 'No Data']
-      - name: mg_awv_rate_performance_status
-        description: "Medical group AWV rate performance status"
-        data_type: string
+              values: ['Good', 'Needs Improvement', 'Missing Data']
+
+      - name: visit_gap
+        description: "Number of additional AWV visits needed in or before the current month to reach the 70% cumulative target."
         tests:
-          - not_null
-          - accepted_values:
-              values: ['Good', 'Needs Improvement', 'Critically Low', 'No Data']
+          - dbt_utils.accepted_range:
+              min_value: 0
+
+      - name: remaining_patients_without_visit
+        description: "Number of patients in the panel who have not yet had an AWV visit by the end of the month."
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+
+
+# Unique constraints
+  - name: unique_int_daily_action_decomposition
+    description: "Unique constraint on daily action decomposition"
     tests:
-      - unique:
-          column_name: "year || '-' || month || '-' || medical_group_id"
-          config:
-            severity: error
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - date_day
+            - medical_group_id
+            - plan_id
+
+  - name: unique_int_monthly_action_summary
+    description: "Unique constraint on monthly action summary"
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - date_month
+            - medical_group_id
+            - plan_id
+
+  - name: unique_int_awv_annual_summary
+    description: "Unique constraint on AWV annual summary"
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - medical_group_id
+            - plan_id
+            - service_year

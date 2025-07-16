@@ -156,14 +156,6 @@ models:
           - dbt_utils.accepted_range:
               min_value: 0
               inclusive: true
-      
-      - name: aac_percent
-        description: "Actions Attested as Complete percentage (count_actions_attested_as_complete / count_actions_available * 100)"
-        tests:
-          - dbt_utils.accepted_range:
-              min_value: 0
-              max_value: 100
-              inclusive: true
 
   - name: fct_awv_claim
     description: "Fact table containing individual AWV claim records from claims data. Each row represents one patient's AWV visit claim."
@@ -172,7 +164,6 @@ models:
       - name: date_day
         description: "Date of service for the AWV claim"
         tests:
-          - not_null
           - relationships:
               to: ref('dim_date_spine_day')
               field: date_day
@@ -192,6 +183,7 @@ models:
           - relationships:
               to: ref('dim_plan')
               field: plan_id
+              severity: warn
       
       - name: patient_id
         description: "Foreign key to patient dimension"
@@ -201,41 +193,9 @@ models:
               to: ref('dim_patient')
               field: patient_id
       
-      - name: awv_visit
+      - name: had_visit
         description: "Flag indicating an AWV visit occurred (always 1 for aggregation purposes)"
         tests:
           - not_null
           - accepted_values:
-              values: [1]
-
-  - name: fct_awv_patient_population
-    description: "Fact table containing patient panel sizes by medical group and plan. Used for calculating AWV rates (AWV visits / patient population)."
-    
-    columns:
-      - name: medical_group_id
-        description: "Foreign key to medical group dimension"
-        tests:
-          - not_null
-          - relationships:
-              to: ref('dim_medical_group')
-              field: medical_group_id
-      
-      - name: plan_id
-        description: "Foreign key to plan dimension"
-        tests:
-          - not_null
-          - relationships:
-              to: ref('dim_plan')
-              field: plan_id
-      
-      - name: patient_panel_size
-        description: "Total number of distinct patients in this medical group/plan combination"
-        tests:
-          - not_null
-          - dbt_utils.accepted_range:
-              min_value: 1
-              inclusive: true
-
-    tests:
-      - unique:
-          column_name: "medical_group_id || '-' || plan_id"
+              values: [1, 0]

@@ -10,6 +10,9 @@
 {% set attested_dates = dbt_utils.get_column_values(ref('stg_actions_attested_as_complete'), 'date_day') | reject('equalto', none) | list %}
 {% set claim_dates = dbt_utils.get_column_values(ref('stg_claims_awv'), 'awv_date_of_service') | reject('equalto', none) | list %}
 {% set all_dates = action_avail_dates + attested_dates + claim_dates %}
+{% if all_dates | length == 0 %}
+  {% do exceptions.raise("No dates found for date spine generation. Check your source tables!") %}
+{% endif %}
 {% set min_date = all_dates | min %}
 {% set max_date = all_dates | max %}
 with date_spine as (
@@ -17,10 +20,10 @@ with date_spine as (
         dbt_utils.date_spine(
             datepart="day",
             start_date="'" ~ min_date|string ~ "'",
-            end_date="'" ~ max_date|string ~ "'"
+            end_date="DATEADD(day, 1, '" ~ max_date|string ~ "')"
         )
     }}
-)
+)   
 
 select
     cast(date_day as date) as date_day,

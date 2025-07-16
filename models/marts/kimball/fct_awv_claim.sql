@@ -20,7 +20,7 @@ final as (
         medical_group_id,
         plan_id,
         patient_id,
-        1 as awv_visit -- flag for agg
+        CASE WHEN awv_date_of_service is not null THEN 1 ELSE 0 END as had_visit -- flag for agg
     from import_claims
 )
 

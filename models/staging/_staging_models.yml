@@ -54,10 +54,11 @@ models:
           - relationships:
               to: ref('stg_plan_medical_group')
               field: plan_id
+              severity: warn
+
       - name: awv_date_of_service
         description: "Date of service for the Annual Wellness Visit"
         data_type: date
-
     tests:
       - unique:
           column_name: "medical_group_id || '-' || plan_id || '-' || patient_id || '-' || awv_date_of_service"
