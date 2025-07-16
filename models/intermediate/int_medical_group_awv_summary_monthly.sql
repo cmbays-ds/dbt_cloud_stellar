@@ -1,7 +1,7 @@
 -- models/intermediate/int_medical_group_awv_summary_monthly.sql
 {{
     config(
-        materialized='ephemeral',
+        materialized='table',
     )
 }}
 
@@ -83,7 +83,7 @@ final AS (
         END AS monthly_awv_performance_status,
 
         -- Calculate gap of visits to hit target
-        GREATEST(0, CEIL(total_patient_count * 0.70) - cumulative_monthly_visits) AS visit_gap,
+        GREATEST(0, CEIL(total_patient_count * 0.70) - cumulative_monthly_visits) AS visit_target_gap,
 
         -- Calculate remaining patients without visits
         GREATEST(0, total_patient_count - cumulative_monthly_visits) AS remaining_patients_without_visit

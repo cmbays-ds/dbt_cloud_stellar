@@ -1,7 +1,7 @@
 -- models/intermediate/int_medical_group_awv_summary_annual.sql
 {{
     config(
-        materialized='ephemeral',
+        materialized='table',
     )
 }}
 
@@ -21,9 +21,12 @@ import_awv_claims AS (
     SELECT
         medical_group_id,
         patient_id,
-        date_day,
         had_visit,
-        date_trunc('year', date_day) AS date_year
+        date_trunc('year', 
+            CASE
+                WHEN date_day IS NULL THEN DATE('2024-12-31') -- coercing nulls to static date, assuming all data is only for 2024
+                ELSE date_day
+            END) AS date_year
     FROM {{ ref('fct_awv_claim') }} a
 ),
 
@@ -46,7 +49,7 @@ final AS (
         
         -- Calculate AWV Rate
         CASE 
-            WHEN patient_count > 0 THEN visit_count / CAST(patient_count AS FLOAT)
+            WHEN patient_count > 0 THEN CAST(visit_count AS FLOAT) / CAST(patient_count AS FLOAT)
             ELSE 0
         END AS awv_rate,
 
@@ -59,7 +62,7 @@ final AS (
         END AS awv_performance_status,
 
         -- Calculate gap of visits to hit target
-        GREATEST(0, CEIL(patient_count * 0.70) - visit_count) AS visit_gap,
+        GREATEST(0, CEIL(patient_count * 0.70) - visit_count) AS visit_target_gap,
 
         -- Calculate remaining patients without visits
         GREATEST(0, patient_count - visit_count) AS remaining_patients_without_visit

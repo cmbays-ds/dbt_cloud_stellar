@@ -1,0 +1,34 @@
+version: 2
+
+models:
+  - name: rpt_medical_group_performance_annual
+    description: >
+      Annual AAC percentage and AWV claims reporting for operations team.
+
+    columns:
+      - name: medical_group_id
+        description: Unique identifier for the medical group.
+
+      - name: date_year
+        description: The reporting year (e.g., 2024).
+
+      - name: medical_group_name
+        description: Name of the medical group.
+
+      - name: visit_count
+        description: Total AWV visits for the medical group in the year.
+
+      - name: patient_count
+        description: Static patient count for the medical group plan (same for all months).
+
+      - name: visit_target_gap
+        description: Gap between target and actual AWV visits for the medical group.
+
+      - name: remaining_patients_without_visit
+        description: Count of medical group patients who have not had a visit.
+
+      - name: awv_rate
+        description: Proportion of patients with completed AWV (aggregated).
+
+      - name: awv_performance_status
+        description: Performance indicator status for AWV rate.

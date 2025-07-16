@@ -1,4 +1,4 @@
--- models/marts/reporting/rpt_medical_group_performance_monthly.sql
+-- models/marts/reporting/rpt_medical_group_plan_performance_monthly.sql
 {{
     config(
         materialized="table",
@@ -7,8 +7,8 @@
 }}
 
 with
-    import_medical_group_dim as (
-        select * from {{ ref("dim_medical_group") }}
+    import_medical_group_plan_dim as (
+        select * from {{ ref("dim_medical_group_plan") }}
     ),
 
     import_date_spine_dim as (
@@ -16,19 +16,21 @@ with
     ),
 
     -- Combined medical group action performance (all plans aggregated)
-    int_medical_group_action_summary_monthly as (
-        select * from {{ ref("int_medical_group_action_summary_monthly") }}
+    int_medical_group_plan_action_summary_monthly as (
+        select * from {{ ref("int_medical_group_plan_action_summary_monthly") }}
     ),
 
     -- Combined medical group avw performance (all plans aggregated)
-    int_medical_group_awv_summary_monthly as (
-        select * from {{ ref("int_medical_group_awv_summary_monthly") }}
+    int_medical_group_plan_awv_summary_monthly as (
+        select * from {{ ref("int_medical_group_plan_awv_summary_monthly") }}
     ),
 
     final as (
         select
             mg.medical_group_id,
             mg.medical_group_name,
+            mg.plan_id,
+            mg.plan_name,
             ds.date_month,
             COALESCE(mga.actions_available_start_month, 0) AS actions_available_start_month,
             COALESCE(mga.actions_available_end_of_month, 0) AS actions_available_end_of_month,
@@ -61,9 +63,9 @@ with
             COALESCE(mga.running_monthly_lost_opportunity_rate, 0) as running_monthly_lost_opportunity_rate,
 
             -- medical group monthly indicators (aggregated across plans)
-            COALESCE(mgv.monthly_awv_performance_status, 'Missing Data') as cumulative_monthly_awv_performance_status,
-            COALESCE(mga.lost_opportunity_status, 'Missing Data') as lost_opportunity_status,
-            COALESCE(mga.aac_performance_status, 'Missing Data') as aac_performance_status,  -- monthly completion rate indicator -- Target = 0.04
+            COALESCE(mgv.monthly_awv_performance_status, 'Missing Data') as mg_cumulative_monthly_awv_performance_status,
+            COALESCE(mga.lost_opportunity_status, 'Missing Data') as mg_lost_opportunity_status,
+            COALESCE(mga.aac_performance_status, 'Missing Data') as mg_aac_performance_status,  -- monthly completion rate indicator -- Target = 0.04
 
             -- medical group month over month measures (aggregated across plans)
             mga.monthly_completion_rate_prev_month,
@@ -71,17 +73,19 @@ with
             mga.monthly_completion_rate_change_mom,
             mga.lost_opportunity_rate_change_mom
 
-        from import_medical_group_dim mg
+        from import_medical_group_plan_dim mg
         cross join import_date_spine_dim ds
         left join
-            int_medical_group_action_summary_monthly mga
+            int_medical_group_plan_action_summary_monthly mga
             on mg.medical_group_id = mga.medical_group_id
+            and mg.plan_id = mga.plan_id
             and ds.date_month = mga.date_month
 
         left join
-            int_medical_group_awv_summary_monthly mgv
+            int_medical_group_plan_awv_summary_monthly mgv
             on ds.date_month = mgv.date_month
             and mg.medical_group_id = mgv.medical_group_id
+            and mg.plan_id = mgv.plan_id
     )
 
 select *

@@ -31,7 +31,8 @@ select
     quarter(date_day) as quarter,
     month(date_day) as month,
     day(date_day) as day,
-    to_char(date_day, 'YYYY-MM') as year_month,
+    date_trunc('month', date_day) as date_month,
+    date_trunc('year', date_day) as date_year,
     weekiso(date_day) as week_number,
     dayofweekiso(date_day) as day_of_week,  -- Day of week (1=Monday, 7=Sunday)
     case when dayofweekiso(date_day) in (6, 7) then 1 else 0 end as is_weekend  -- Is weekend (1 if Saturday or Sunday, else 0)

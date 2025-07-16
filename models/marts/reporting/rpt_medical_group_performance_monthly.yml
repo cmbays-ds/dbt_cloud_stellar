@@ -1,0 +1,94 @@
+version: 2
+
+models:
+  - name: rpt_medical_group_performance_monthly
+    description: >
+      Monthly AAC percentage reporting for operations team.
+
+    columns:
+      - name: medical_group_id
+        description: Unique identifier for the medical group.
+
+      - name: medical_group_name
+        description: Name of the medical group.
+
+      - name: date_month
+        description: The reporting month (e.g., '2024-07').
+
+      - name: actions_available_start_month
+        description: Number of actions available at the start of the month.
+
+      - name: actions_available_end_of_month
+        description: Number of actions available at the end of the month.
+
+      - name: monthly_net_change_of_actions
+        description: Net change in available actions during the month.
+
+      - name: days_with_data
+        description: Number of days in the month for which data is available.
+
+      - name: weekend_days
+        description: Number of weekend days in the month.
+
+      - name: monthly_actions_completed
+        description: Count of actions completed in the month.
+
+      - name: monthly_actions_became_ineligible
+        description: Number of actions that became ineligible in the month.
+
+      - name: visit_count_per_month
+        description: Number of AWV visits performed in the month.
+
+      - name: total_patient_count
+        description: Total patient count for the medical group (static).
+
+      - name: monthly_running_total_actions_completed
+        description: Running total of actions completed up to and including the month.
+
+      - name: monthly_running_total_actions_became_ineligible
+        description: Running total of actions that became ineligible up to and including the month.
+
+      - name: cumulative_monthly_visits
+        description: Cumulative AWV visits up to and including the month.
+
+      - name: visit_target_gap
+        description: Gap between AWV visit target and actual visits (cumulative).
+
+      - name: remaining_patients_without_visit
+        description: Number of patients remaining without a visit.
+
+      - name: monthly_completion_rate
+        description: Monthly AAC completion rate (percentage).
+
+      - name: running_monthly_completion_rate
+        description: Running (cumulative) AAC completion rate.
+
+      - name: cumulative_monthly_awv_visit_rate
+        description: Cumulative monthly AWV visit rate.
+
+      - name: monthly_lost_opportunity_rate
+        description: AAC lost opportunity rate for the month.
+
+      - name: running_monthly_lost_opportunity_rate
+        description: Running (cumulative) AAC lost opportunity rate.
+
+      - name: cumulative_monthly_awv_performance_status
+        description: Cumulative AWV performance status for the month.
+
+      - name: lost_opportunity_status
+        description: Status indicator for lost opportunities.
+
+      - name: aac_performance_status
+        description: Performance indicator for AAC monthly completion rate (target = 0.04).
+
+      - name: monthly_completion_rate_prev_month
+        description: Previous month's AAC completion rate.
+
+      - name: monthly_lost_opportunity_rate_prev_month
+        description: Previous month's AAC lost opportunity rate.
+
+      - name: monthly_completion_rate_change_mom
+        description: Month-over-month change in AAC completion rate.
+
+      - name: lost_opportunity_rate_change_mom
+        description: Month-over-month change in lost opportunity rate.

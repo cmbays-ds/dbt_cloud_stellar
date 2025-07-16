@@ -2,7 +2,7 @@
 
 {{
     config(
-        materialized='ephemeral',
+        materialized='table',
         indexes=[
             {'columns': ['medical_group_id', 'date_month'], 'unique': True},
             {'columns': ['date_month']},

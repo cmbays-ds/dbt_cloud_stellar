@@ -22,9 +22,12 @@ import_awv_claims AS (
         medical_group_id,
         plan_id,
         patient_id,
-        date_day,
         had_visit,
-        date_trunc('year', date_day) AS date_year
+        date_trunc('year', 
+            CASE
+                WHEN date_day IS NULL THEN DATE('2024-12-31') -- coercing nulls to static date, assuming all data is only for 2024
+                ELSE date_day
+            END) AS date_year
     FROM {{ ref('fct_awv_claim') }} a
 ),
 
@@ -49,15 +52,15 @@ final AS (
         
         -- Calculate AWV Rate
         CASE 
-            WHEN patient_count > 0 THEN visit_count / CAST(patient_count AS FLOAT)
+            WHEN patient_count > 0 THEN CAST(visit_count AS FLOAT) / CAST(patient_count AS FLOAT)
             ELSE 0
         END AS awv_rate,
 
         -- Calculate AWV Status
         CASE 
             WHEN patient_count <= 0 THEN 'Missing Data'
-            WHEN visit_count / CAST(patient_count AS FLOAT) >= 0.7 THEN 'Good'
-            WHEN visit_count / CAST(patient_count AS FLOAT) < 0.7 THEN 'Needs Improvement'
+            WHEN CAST(visit_count AS FLOAT) / CAST(patient_count AS FLOAT) >= 0.7 THEN 'Good'
+            WHEN CAST(visit_count AS FLOAT) / CAST(patient_count AS FLOAT) < 0.7 THEN 'Needs Improvement'
             ELSE 'Missing Data'
         END AS awv_performance_status,
 
