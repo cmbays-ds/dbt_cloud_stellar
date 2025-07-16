@@ -1,255 +1,148 @@
-# dbt Cloud Stellar Health Analytics Project
+# Stellar Health Analytics – dbt & Tableau Project
 
-## Overview
+## 1. Executive Summary
+This repository delivers an **end-to-end analytics stack**—Snowflake ↔ dbt ↔ Tableau Public—that enables Stellar Health’s Operations Team to monitor two core value-based-care KPIs across the seven medical groups they manage:
 
-This dbt project transforms raw healthcare data into actionable insights for operations teams managing Annual Wellness Visit (AWV) programs. The project follows a modern data modeling approach using the Kimball dimensional modeling technique with dbt best practices.
+* **Annual Wellness Visit (AWV) Rate** – Target **70 %** by calendar year‐end.
+* **Actions Attested as Complete (AAC %)** – Target **4 %** every month.
 
-## Project Structure
+The dbt project transforms raw CSV extracts into a **Kimball star schema** and publishes lightweight reporting marts that Tableau can consume with minimal joins.  A pre-built Tableau Public dashboard (PDF & PNG tooltips included) highlights under-performing groups and guides timely interventions.
 
+---
+
+## 2. Business Context & KPIs
+| KPI | Definition | Granularity | “Good” Threshold |
+|-----|------------|-------------|------------------|
+| **AWV Rate** | `patients with AWV / total patients` | Annual | ≥ 70 % |
+| **AAC %** | `actions attested complete / actions available` | Monthly | ≥ 4 % |
+
+> **Why both?**  Claims lag masks recent performance, while AAC % surfaces user behaviour inside the Stellar Health app in near-real time.  Viewed together, the KPIs tell Operations **when** and **where** to coach clinics.
+
+---
+
+## 3. Repository Layout <sup>[GitHub tree]</sup>
 ```
 dbt_cloud_stellar/
-├── models/
-│   ├── sources/
-│   │   └── _raw_data.yml                    # Source definitions
-│   ├── staging/
-│   │   ├── stg_actions_attested_as_complete.sql
-│   │   ├── stg_actions_available.sql
-│   │   ├── stg_claims_awv.sql
-│   │   ├── stg_plan_medical_group.sql
-│   │   └── _staging__models.yml            # Staging layer configuration
-│   ├── intermediate/
-│   │   ├── int_awv_monthly_summary.sql
-│   │   ├── int_awv_annual_summary.sql
-│   │   ├── int_medical_group_performance.sql
-│   │   └── _intermediate__models.yml       # Intermediate layer configuration
-│   └── marts/
-│       ├── kimball/                        # Dimensional models
-│       │   ├── dim_date_spine_day.sql
-│       │   ├── dim_medical_group.sql
-│       │   ├── dim_patient.sql
-│       │   ├── dim_plan.sql
-│       │   ├── fct_awv_action.sql
-│       │   ├── fct_awv_claim.sql
-│       │   └── fct_awv_patient_population.sql
-│       └── reporting/                      # Business reporting models
-│           ├── rpt_operations_dashboard.sql
-│           ├── rpt_awv_annual_rate.sql
-│           ├── rpt_aac_monthly.sql
-│           └── _reporting__models.yml      # Reporting layer configuration
-├── analyses/
-├── macros/
-├── seeds/
-├── snapshots/
-├── tests/
-├── dbt_project.yml                         # Project configuration
-├── packages.yml                            # Package dependencies
-└── README.md                              # This file
+├─ Tableau Dashboard/          # PDF & PNG exports of the public viz
+├─ models/
+│  ├─ sources/                 # Source definitions            
+│  ├─ staging/                 # Cleansing / conforming        
+│  ├─ intermediate/            # Business logic                
+│  ├─ marts/
+│  │  ├─ kimball/              # Dim-/fact star schema         
+│  │  └─ reporting/            # Denormalised reporting views  
+│  └─ ...
+├─ macros/  ─ analyses/  ─ seeds/  ─ snapshots/  ─ tests/
+├─ dbt_project.yml             # Project config
+└─ packages.yml                # `dbt_utils` dependency
 ```
 
-## Business Context
+---
 
-This project supports value-based care initiatives by tracking two key performance indicators:
+## 4. Snowflake Architecture & Data Model
+![dbt_project_DAG.png](https://github.com/cmbays-ds/dbt_cloud_stellar/blob/main/dbt_project_DAG.png?raw=true)
 
-1. **Annual Visit Rate (AWV Rate)**: Percentage of patients who complete their Annual Wellness Visit
-   - **Target**: 70% annually
-   - **Formula**: (Number of patients with AWV / Total patient panel size) × 100
+### 4·1  Source Layer  *(raw CSV → Snowflake stage → table)*
+* `raw__AWVs_plan_medical_group`
+* `raw__AWV_as_seen_in_claims`
+* `raw__AWVs_actions_available`
+* `raw__AWVs_attested_as_complete`
 
-2. **Actions Attested as Complete (AAC) Rate**: Percentage of available actions that are completed
-   - **Target**: 4% monthly
-   - **Formula**: (Actions attested as complete / Total actions available) × 100
+### 4·2  Staging Layer (`models/staging/`)
+* Type casting, column renames
+* **Tests:** `not_null`, `unique`, `relationships`
 
-## Data Architecture
+### 4·3  Intermediate Layer (`models/intermediate/`)
+Reusable aggregates, e.g. `int_medical_group_action_summary_monthly.sql` produces **AAC %**, **available actions start-of-month**, and **lost opportunities**.
 
-### Layer 1: Sources
-Raw data ingested from CSV files into Snowflake:
-- `raw__AWVs_plan_medical_group`: Medical group and plan reference data
-- `raw__AWV_as_seen_in_claims`: AWV claims data
-- `raw__AWVs_actions_available`: Available actions per day
-- `raw__AWVs_attested_as_complete`: Completed actions per day
+### 4·4  Kimball Layer (`models/marts/kimball/`)
+| Dimension | Grain | Key Columns |
+|-----------|-------|-------------|
+| `dim_date_spine_day` | Day | `date_day` |
+| `dim_medical_group` | Medical group | `medical_group_sk` |
+| `dim_plan` | Insurance plan | `plan_sk` |
+| `dim_patient` | Patient | `patient_sk` |
 
-### Layer 2: Staging
-Cleanses and standardizes raw data:
-- Data type casting
-- Column renaming
-- Basic data validation
-- Minimal transformations
+| Fact | Grain | Measures |
+|------|-------|----------|
+| `fct_awv_claim` | Patient × visit | visit flag |
+| `fct_awv_action` | Plan × group × day | actions available / completed |
 
-### Layer 3: Intermediate
-Contains business logic and reusable transformations:
-- `int_awv_monthly_summary`: Monthly AWV action aggregations
-- `int_awv_annual_summary`: Annual AWV rate calculations
-- `int_medical_group_performance`: Combined medical group performance metrics
+### 4·5  Reporting Layer (`models/marts/reporting/`)
+* `rpt_medical_group_performance_monthly` – **AAC %** + threshold flag
+* `rpt_medical_group_performance_annual` – **AWV Rate** + threshold flag
 
-### Layer 4: Kimball Dimensional Models
-Classical star schema implementation:
-- **Dimensions**: Date, Medical Group, Patient, Plan
-- **Facts**: AWV Claims, AWV Actions, Patient Population
+These two views are the **only** tables Tableau needs, ensuring a 1-to-1 relationship between viz and SQL logic.
 
-### Layer 5: Reporting Marts
-Business-ready models for analytics and dashboards:
-- `rpt_operations_dashboard`: Comprehensive operations view
-- `rpt_awv_annual_rate`: Annual AWV rate reporting
-- `rpt_aac_monthly`: Monthly AAC percentage reporting
+---
 
-## Key Features
-
-### Performance Monitoring
-- **Intervention Flags**: Automatic flagging of medical groups needing attention
-- **Performance Status**: Categorization of performance levels (Good, Needs Improvement, Critically Low, No Data)
-- **Target Tracking**: Built-in target comparisons for both KPIs
-
-### Data Quality
-- Comprehensive dbt tests covering:
-  - Null value checks
-  - Uniqueness constraints
-  - Referential integrity
-  - Range validations
-  - Accepted value lists
-
-### Scalability
-- Modular design allowing easy addition of new metrics
-- Incremental model capability where appropriate
-- Efficient aggregation patterns
-
-## User Stories Addressed
-
-### Operations Team Member Requirements
-
-1. **Combined Medical Group Outcomes**
-   - View: `rpt_operations_dashboard`
-   - Shows aggregated performance across all plans for each medical group
-   - Includes intervention flags for underperforming groups
-
-2. **Monthly AAC Monitoring**
-   - View: `rpt_aac_monthly`
-   - Tracks monthly AAC percentages at both plan and medical group levels
-   - Identifies groups not meeting the 4% target
-
-## Technical Setup
-
-### Prerequisites
-- dbt Cloud account (free tier supported)
-- Snowflake account (free tier supported)
-- GitHub account for version control
-
-### Installation
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/cmbays-ds/dbt_cloud_stellar.git
-   cd dbt_cloud_stellar
-   ```
-
-2. **Configure dbt Cloud connection**
-   - Set up Partner Connect between Snowflake and dbt Cloud
-   - Configure project to use PC_DBT_DB database and DBT_CBAYS schema
-
-3. **Install dependencies**
-   ```bash
-   dbt deps
-   ```
-
-4. **Run the project**
-   ```bash
-   dbt run
-   dbt test
-   ```
-
-### Development Workflow
-
-1. **Staging Layer Development**
-   ```bash
-   dbt run --select staging
-   dbt test --select staging
-   ```
-
-2. **Intermediate Layer Development**
-   ```bash
-   dbt run --select intermediate
-   dbt test --select intermediate
-   ```
-
-3. **Marts Layer Development**
-   ```bash
-   dbt run --select marts
-   dbt test --select marts
-   ```
-
-4. **Full Pipeline**
-   ```bash
-   dbt run
-   dbt test
-   ```
-
-## Data Lineage
-
+## 5. dbt Test Suite & Known Data Quality Warning
+During `dbt test` the following warning surfaces:
+```text
+WARN 689 relationships_stg_claims_awv_plan_id__plan_id__ref_stg_plan_medical_group_
 ```
-Raw Sources → Staging → Intermediate → Kimball → Reporting
-     ↓           ↓          ↓           ↓         ↓
-   CSV Files   Clean     Business    Star      Dashboard
-              Data       Logic      Schema     Ready
+**Symptom:** `plan_id` values exist in `stg_claims_awv` that are **absent** from `stg_plan_medical_group`, and vice-versa.
+
+Diagnostic queries (Snowflake):
+```sql
+-- Plans in claims but not in dimension
+select distinct a.plan_id
+from stg_claims_awv a
+left join stg_plan_medical_group b on a.plan_id = b.plan_id
+where b.plan_id is null;  -- returns: 1210, 1166, 98
+
+-- Plans in dimension but never seen in claims
+select distinct a.plan_id
+from stg_plan_medical_group a
+left join stg_claims_awv b on a.plan_id = b.plan_id
+where b.plan_id is null;  -- returns: 1297, 8, 1306
 ```
+**Business Explanation:** these IDs reveal either (1) claims arriving before the reference table was loaded, or (2) orphan rows in the dimension.  Until resolved the warning remains **severity = warn** to preserve pipeline continuity.
 
-## Testing Strategy
+---
 
-### Staging Layer Tests
-- **Data Quality**: Null checks, data type validation
-- **Referential Integrity**: Foreign key relationships
-- **Uniqueness**: Primary key constraints
+## 6. Analytical Assumptions & Caveats
+1. **Action Inventory Dynamics** – Initial belief: actions only decrease over time.  Reality: **new actions can appear mid-year**, increasing the count.  Because dbt lacks event-level detail to distinguish *new*, *expired*, and *carried-over* actions, we
+   * take **action count on the first day of each month** as the denominator for **AAC %**.
+   * treat `(Δ available_actions − attested_complete)` as **ineligible/lost**.
+2. **Carry-Over Logic** – If an action remains eligible it is re-counted in `AWVs_actions_available` on subsequent days.
+3. **AWV Rate Numerator** – Any claim with a non-null `AWV_DATE_OF_SERVICE` counts as one completed visit **per patient per year**.  Null dates imply no visit.
+4. **Linking Visits to Actions** – Patients without a visit cannot be dated, preventing a perfect blend of visit and action data in Tableau.
 
-### Intermediate Layer Tests
-- **Business Logic**: Range validations, calculated field accuracy
-- **Aggregation Integrity**: Sum and count validations
-- **Performance Metrics**: Target threshold testing
+---
 
-### Marts Layer Tests
-- **Reporting Accuracy**: Cross-layer validation
-- **Performance Indicators**: Status flag validation
-- **Dashboard Readiness**: Final output validation
+## 7. Tableau Public Dashboard
+* **File:** `Tableau Dashboard/Medical Groups Performance Monitoring Dashboard.pdf`
+* **Data Source:** Snowflake ↔ `rpt_medical_group_performance_*` views.
+* **Key Visuals**
+  * **Intervention Alert** – red/amber/green status per group.
+  * **AWV Annual Performance** – bar vs 70 % target.
+  * **AAC % Monthly Trend** – line vs 4 % target.
 
-## Tableau Public Integration
+Dashboard Preview:
 
-### Recommended Data Source
-Use the reporting layer models as your primary data source:
-- `rpt_operations_dashboard` for comprehensive dashboards
-- `rpt_awv_annual_rate` for AWV rate trending
-- `rpt_aac_monthly` for monthly AAC monitoring
+![Medical Groups Performance Monitoring Dashboard](https://github.com/cmbays-ds/dbt_cloud_stellar/blob/main/Tableau%20Dashboard/Medical%20Groups%20Performance%20Monitoring%20Dashboard.png?raw=true) 
+dashboard overview for Operations Team KPI tracking.
 
-### Data Modeling for Tableau
-- **Grain**: Each reporting model has a clearly defined grain
-- **Denormalization**: Tables are pre-joined for optimal dashboard performance
-- **Calculated Fields**: Business logic is pre-calculated in dbt
-- **Performance Flags**: Built-in intervention indicators
+![AAC% Monthly Trend Tooltip](https://github.com/cmbays-ds/dbt_cloud_stellar/blob/main/Tableau%20Dashboard/AAC%25%20Monthly%20Trend%20Tooltip.png?raw=true)
 
-## Best Practices Implemented
+![AWV Annual Performance Tooltip](https://github.com/cmbays-ds/dbt_cloud_stellar/blob/main/Tableau%20Dashboard/AWV%20Annual%20Performance%20Tooltip.png?raw=true)
 
-### dbt Conventions
-- **Naming**: Clear, consistent naming conventions
-- **Documentation**: Comprehensive model and column descriptions
-- **Testing**: Robust test coverage across all layers
-- **Modularity**: DRY principles with reusable intermediate models
+![Intervention Alert Tooltip](https://github.com/cmbays-ds/dbt_cloud_stellar/blob/main/Tableau%20Dashboard/Intervention%20Alert%20Tooltip.png?raw=true)
 
-## Troubleshooting
+Full Dashboard (PDF):
 
-### Common Issues
+[Download the full dashboard as PDF](https://github.com/cmbays-ds/dbt_cloud_stellar/blob/main/Tableau%20Dashboard/Medical%20Groups%20Performance%20Monitoring%20Dashboard.pdf)
 
-1. **Connection Errors**
-   - Verify Snowflake connection in dbt Cloud for all used environments
-   - Check database and schema permissions
-
-2. **Missing Data**
-   - Verify raw data has been loaded to Snowflake
-   - Check database and schema ref in dbt Cloud match where data loaded in Snowflake
-
-3. **Test Failures**
-   - Review test output for specific failures
-   - Check data quality in upstream sources
+---
 
 
+---
 
-## Resources:
-- Learn more about dbt [in the docs](https://docs.getdbt.com/docs/introduction)
-- Check out [Discourse](https://discourse.getdbt.com/) for commonly asked questions and answers
-- Join the [dbt community](https://getdbt.com/community) to learn from other analytics engineers
-- Find [dbt events](https://events.getdbt.com) near you
-- Check out [the blog](https://blog.getdbt.com/) for the latest news on dbt's development and best practices
+## 10. Future Enhancements
+* **New Actions Table** capture actions data in a new source to distinguish *new* vs *carried-over* inventory.
+* **Incremental models** for faster builds on large datasets.
+* **DATASHARE** raw tables directly from source to eliminate CSV load.
+* **CI/CD** with GitHub Actions → Snowflake Dev → Prod.
+
+
