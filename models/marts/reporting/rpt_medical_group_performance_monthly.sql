@@ -33,6 +33,7 @@ with
             COALESCE(mga.actions_available_start_month, 0) AS actions_available_start_month,
             COALESCE(mga.actions_available_end_of_month, 0) AS actions_available_end_of_month,
             COALESCE(mga.monthly_net_change_of_actions, 0) AS  monthly_net_change_of_actions,
+            COALESCE(mga.monthly_net_new_available_actions, 0) AS monthly_net_new_available_actions,
             COALESCE(mga.days_with_data, 0) AS days_with_data,
             COALESCE(mga.weekend_days, 0) AS weekend_days,
 

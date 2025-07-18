@@ -33,8 +33,9 @@ WITH import_daily_action_decomposition AS (
         cumulative_actions_completed,
         count_actions_became_ineligible_in_day,
         cumulative_actions_became_ineligible,
+        daily_net_new_available_actions,
         is_weekend
-    FROM {{ ref('int_daily_action_decomposition') }}
+    FROM {{ ref('int_medical_group_action_decomposition_daily') }}
 ),
 
 int_agg_monthly_actions AS (
@@ -42,7 +43,7 @@ int_agg_monthly_actions AS (
         medical_group_id,
         DATE_TRUNC('month', date_day) date_month,
         MAX(actions_start_of_day) AS actions_available_start_month,
-        MIN(actions_end_of_day) AS actions_available_end_of_month,
+        MAX(actions_end_of_day) AS actions_available_end_of_month,
         SUM(actions_completed) AS monthly_actions_completed,
         SUM(count_actions_became_ineligible_in_day) AS monthly_actions_became_ineligible,
         MAX(cumulative_actions_completed) AS monthly_running_total_actions_completed,
@@ -51,38 +52,25 @@ int_agg_monthly_actions AS (
         -- Calculate monthly net change of actions (completions + lost opportunities)
         SUM(daily_net_change_of_actions) as monthly_net_change_of_actions,
 
+        -- Calculate monthly net new actions that became available subtracting completed and ineligible actions
+        SUM(daily_net_new_available_actions) as monthly_net_new_available_actions,
+
         -- Calculate monthly progress of completed actions
         CASE
-            WHEN (SELECT MAX(actions_start_of_day) FROM import_daily_action_decomposition) > 0
+            WHEN MAX(actions_start_of_day) > 0
             THEN SUM(actions_completed)
-                / (SELECT MAX(actions_start_of_day) FROM import_daily_action_decomposition)
+                / MAX(actions_start_of_day)
             ELSE 0 END
             AS monthly_completion_rate,
 
-        -- Calculate running total monthly progress of completed actions
-        CASE
-            WHEN (SELECT MAX(actions_start_of_day) FROM import_daily_action_decomposition) > 0
-            THEN MAX(cumulative_actions_completed)
-                / (SELECT MAX(actions_start_of_day) FROM import_daily_action_decomposition)
-            ELSE 0 END
-            AS running_monthly_completion_rate,
-
         -- Calculate monthly progress of lost opportunities
         CASE 
-            WHEN (SELECT MAX(actions_start_of_day) FROM import_daily_action_decomposition) > 0
+            WHEN MAX(actions_start_of_day) > 0
             THEN SUM(count_actions_became_ineligible_in_day)
-                / (SELECT MAX(actions_start_of_day) FROM import_daily_action_decomposition) 
+                / MAX(actions_start_of_day)
             ELSE 0 END
             AS monthly_lost_opportunity_rate,
 
-        -- Calculate running total monthly progress of lost opportunities
-        CASE
-            WHEN (SELECT MAX(actions_start_of_day) FROM import_daily_action_decomposition) > 0
-            THEN MAX(cumulative_actions_became_ineligible)
-                / (SELECT MAX(actions_start_of_day) FROM import_daily_action_decomposition) 
-            ELSE 0 END
-            AS running_monthly_lost_opportunity_rate,
-        
         -- Count of days with data
         COUNT(*) AS days_with_data,
         
@@ -90,6 +78,18 @@ int_agg_monthly_actions AS (
         SUM(CASE WHEN is_weekend THEN 1 ELSE 0 END) AS weekend_days
     FROM import_daily_action_decomposition
     GROUP BY medical_group_id, date_month
+),
+
+int_agg_running_available_actions AS (
+    SELECT 
+        medical_group_id,
+        date_month,
+        SUM(actions_available_start_month) OVER (
+            PARTITION BY medical_group_id
+            ORDER BY date_month
+            ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+        ) as monthly_running_total_actions_available
+    FROM int_agg_monthly_actions
 ),
 
 final AS (
@@ -103,12 +103,26 @@ final AS (
         monthly_running_total_actions_completed,
         monthly_running_total_actions_became_ineligible,
         monthly_net_change_of_actions,
+        monthly_net_new_available_actions,
         monthly_completion_rate,
-        running_monthly_completion_rate,
         monthly_lost_opportunity_rate,
-        running_monthly_lost_opportunity_rate,
-        days_with_data,
-        weekend_days,
+        monthly_running_total_actions_available,
+
+        -- Calculate running total monthly progress of completed actions
+        CASE
+            WHEN monthly_running_total_actions_available > 0
+            THEN monthly_running_total_actions_completed
+                / monthly_running_total_actions_available
+            ELSE 0 END
+            AS running_monthly_completion_rate,
+
+        -- Calculate running total monthly progress of lost opportunities
+        CASE
+            WHEN monthly_running_total_actions_available > 0
+            THEN monthly_running_total_actions_became_ineligible
+                / monthly_running_total_actions_available 
+            ELSE 0 END
+            AS running_monthly_lost_opportunity_rate,
 
         -- Performance status flags
         CASE 
@@ -132,9 +146,14 @@ final AS (
         LAG(monthly_lost_opportunity_rate, 1) OVER (
             PARTITION BY medical_group_id
             ORDER BY date_month
-        ) AS monthly_lost_opportunity_rate_prev_month
+        ) AS monthly_lost_opportunity_rate_prev_month,
+
+        days_with_data,
+        weekend_days
         
     FROM int_agg_monthly_actions
+JOIN int_agg_running_available_actions
+    USING(medical_group_id, date_month)
 )
 
 SELECT 

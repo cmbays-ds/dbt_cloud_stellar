@@ -40,7 +40,6 @@ dbt_cloud_stellar/
 ---
 
 ## 4. Snowflake Architecture & Data Model
-![dbt_project_DAG.png](https://github.com/cmbays-ds/dbt_cloud_stellar/blob/main/dbt_project_DAG.png?raw=true)
 
 ### 4·1  Source Layer  *(raw CSV → Snowflake stage → table)*
 * `raw__AWVs_plan_medical_group`
@@ -59,9 +58,9 @@ Reusable aggregates, e.g. `int_medical_group_action_summary_monthly.sql` produce
 | Dimension | Grain | Key Columns |
 |-----------|-------|-------------|
 | `dim_date_spine_day` | Day | `date_day` |
-| `dim_medical_group` | Medical group | `medical_group_id` |
-| `dim_plan` | Insurance plan | `plan_id` |
-| `dim_patient` | Patient | `patient_id` |
+| `dim_medical_group` | Medical group | `medical_group_sk` |
+| `dim_plan` | Insurance plan | `plan_sk` |
+| `dim_patient` | Patient | `patient_sk` |
 
 | Fact | Grain | Measures |
 |------|-------|----------|
@@ -108,7 +107,6 @@ where b.plan_id is null;  -- returns: 1297, 8, 1306
 2. **Carry-Over Logic** – If an action remains eligible it is re-counted in `AWVs_actions_available` on subsequent days.
 3. **AWV Rate Numerator** – Any claim with a non-null `AWV_DATE_OF_SERVICE` counts as one completed visit **per patient per year**.  Null dates imply no visit.
 4. **Linking Visits to Actions** – Patients without a visit cannot be dated, preventing a perfect blend of visit and action data in Tableau.
-5. **Reporting Window** - Data only available for Y2024. Tooks steps to future-proof for following years, but assumed this project is specifically for Y2024.
 
 ---
 
@@ -122,7 +120,7 @@ where b.plan_id is null;  -- returns: 1297, 8, 1306
 
 Dashboard Preview:
 
-![Medical Groups Performance Monitoring Dashboard](https://github.com/cmbays-ds/dbt_cloud_stellar/blob/main/Tableau%20Dashboard/Medical%20Groups%20Performance%20Monitoring%20Dashboard.png?raw=true) 
+![Medical Groups Performance Monitoring Dashboard](https://github.com/cmbays-ds/dbt_cloud_stellar/blob/main/Tableau%20Dashboard/Medical%20Groups%20Performance%20Monitoring%20Dashboard.pdf) 
 dashboard overview for Operations Team KPI tracking.
 
 ![AAC% Monthly Trend Tooltip](https://github.com/cmbays-ds/dbt_cloud_stellar/blob/main/Tableau%20Dashboard/AAC%25%20Monthly%20Trend%20Tooltip.png?raw=true)
@@ -142,11 +140,8 @@ Full Dashboard (PDF):
 
 ## 10. Future Enhancements
 * **New Actions Table** capture actions data in a new source to distinguish *new* vs *carried-over* inventory.
-* **Use Surrogate Keys** define unique keys as surrogate keys in dimension tables.
-* **Asset Materializations** switch intermediate models to ephemeral. Create rpt_<model_name>_vw to virtualize assets used in downstream BI tools
 * **Incremental models** for faster builds on large datasets.
 * **DATASHARE** raw tables directly from source to eliminate CSV load.
 * **CI/CD** with GitHub Actions → Snowflake Dev → Prod.
-* **Tableau Dashboard Upgrade** create drill-downs to view plan level details
 
 
